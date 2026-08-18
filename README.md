@@ -1,42 +1,100 @@
-![](../../workflows/gds/badge.svg) ![](../../workflows/docs/badge.svg) ![](../../workflows/test/badge.svg) ![](../../workflows/fpga/badge.svg)
+# AgilA8 - an 8-bit Microcontroller
+Agila is Tagalog for "eagle" - specifically evoking the Philippine Eagle (Haribon), the country's national bird. AgilA8 pairs that with A8, the name of the CPU core at the center of the design: Agil + A8 = AgilA8, the two overlapping on a shared capital A.
 
-# Tiny Tapeout Verilog Project Template
+## How it works
 
-- [Read the documentation for project](docs/info.md)
+AgilA8 is a compact 8-bit microcontroller built around A8, a custom
+16-instruction CPU (see `docs/ISA.md`), with memory-mapped GPIO, a 16-bit
+timer, and PWM generation.
 
-## What is Tiny Tapeout?
+Both instruction and data memory live off-chip on the Tiny Tapeout QSPI
+Pmod, sharing its SD0/SD1/SCK lines between two separate chip selects.
+This keeps the on-chip design small enough to fit a 1x2 tile budget -
+Tiny Tapeout's own RAM32 macro is *half* the size of this design's DMEM
+and needs 3x2 tiles on its own, so a plain on-chip flip-flop array was
+never going to fit. Program code is fetched from external SPI flash
+(CS0) using a standard `03h` Read Data command; data memory lives on one
+of the Pmod's two PSRAM chips (RAM A / CS1) using standard `02h`/`03h`
+Write/Read commands. Only plain, single-line SPI commands are used -
+deliberately not flash's continuous-read mode or PSRAM's QPI mode, both
+of which need a mode-byte/setup sequence that's easy to get subtly wrong
+without hardware to verify against.
 
-Tiny Tapeout is an educational project that aims to make it easier and cheaper than ever to get your digital and analog designs manufactured on a real chip.
+Because `imem_valid` and `dmem_valid` are never asserted in the same
+cycle (fetch and memory-access are separate, sequential states in the
+core's FSM), the flash and PSRAM controllers can share the SD0/SD1/SCK
+lines through a simple mux rather than needing real bus arbitration.
+The Pmod's second PSRAM chip (RAM B / CS2) is left deselected and
+unused - the DMEM window doesn't need it.
 
-To learn more and get started, visit https://tinytapeout.com.
+### Address map
 
-## Set up your Verilog project
+| Address range | Device                                  |
+| -------------- | --------------------------------------- |
+| 0x00 - 0xEF, 0xF3 - 0xF7 | RAM (external PSRAM, RAM A)   |
+| 0xF0 - 0xF2    | GPIO                                    |
+| 0xF8 - 0xFB    | Timer                                   |
+| 0xFC - 0xFD    | PWM                                     |
 
-1. Add your Verilog files to the `src` folder.
-2. Edit the [info.yaml](info.yaml) and update information about your project, paying special attention to the `source_files` and `top_module` properties. If you are upgrading an existing Tiny Tapeout project, check out our [online info.yaml migration tool](https://tinytapeout.github.io/tt-yaml-upgrade-tool/).
-3. Edit [docs/info.md](docs/info.md) and add a description of your project.
-4. Adapt the testbench to your design. See [test/README.md](test/README.md) for more information.
+Instructions are fetched separately, as two consecutive bytes from
+external flash (big-endian: high byte at PC, low byte at PC+1) - flash
+isn't part of the 8-bit DMEM address space above.
 
-The GitHub action will automatically build the ASIC files using [LibreLane](https://www.zerotoasiccourse.com/terminology/librelane/).
+#### GPIO
 
-## Enable GitHub actions to build the results page
+| Register | Address     | Description                                                      |
+| -------- | ----------- | ------------------------------------------------------------------ |
+| GPIO_OUT | 0xF0 (R/W)  | Write sets `uo_out[6:0]`; read returns the last value written    |
+| GPIO_IN  | 0xF1 (R)    | Reads the current state of `ui_in[7:0]`                          |
+| GPIO_DIR | 0xF2 (R/W)  | Read/write register; not wired to anything (`ui_in`/`uo_out` are fixed-direction TT pins, so there's no direction to control) |
 
-- [Enabling GitHub Pages](https://tinytapeout.com/faq/#my-github-action-is-failing-on-the-pages-part)
+`uo_out[7]` is dedicated to the PWM output, not GPIO - a write of
+`0xAA` to GPIO_OUT reads back as `0xAA` internally, but only
+`uo_out[6:0]` (`0x2A` in that example) reaches a physical pin.
 
-## Resources
+#### Timer
 
-- [FAQ](https://tinytapeout.com/faq/)
-- [Digital design lessons](https://tinytapeout.com/digital_design/)
-- [Learn how semiconductors work](https://tinytapeout.com/siliwiz/)
-- [Join the community](https://tinytapeout.com/discord)
-- [Build your design locally](https://www.tinytapeout.com/guides/local-hardening/)
+| Register    | Address     | Description                                                    |
+| ----------- | ----------- | ---------------------------------------------------------------- |
+| TIMER_LO    | 0xF8 (R)    | Bits 7:0 of the free-running 16-bit counter                    |
+| TIMER_HI    | 0xF9 (R)    | Bits 15:8 of the counter                                       |
+| TIMER_CTRL  | 0xFA (R/W)  | Bit 0 = enable (counts up once per clock while set). Writing bit 1 = 1 resets the counter to 0 |
+| TIMER_FLAG  | 0xFB (R/W)  | Bit 0 = overflow (set when the counter wraps past 0xFFFF); any write clears it |
 
-## What next?
+#### PWM
 
-- [Submit your design to the next shuttle](https://app.tinytapeout.com/).
-- Edit [this README](README.md) and explain your design, how it works, and how to test it.
-- Share your project on your social network of choice:
-  - LinkedIn [#tinytapeout](https://www.linkedin.com/search/results/content/?keywords=%23tinytapeout) [@TinyTapeout](https://www.linkedin.com/company/100708654/)
-  - Mastodon [#tinytapeout](https://chaos.social/tags/tinytapeout) [@matthewvenn](https://chaos.social/@matthewvenn)
-  - X (formerly Twitter) [#tinytapeout](https://twitter.com/hashtag/tinytapeout) [@tinytapeout](https://twitter.com/tinytapeout)
-  - Bluesky [@tinytapeout.com](https://bsky.app/profile/tinytapeout.com)
+| Register  | Address     | Description                                                        |
+| --------- | ----------- | ---------------------------------------------------------------------- |
+| PWM_DUTY  | 0xFC (R/W)  | 8-bit duty cycle out of a free-running 256-cycle period. `0xFF` is a special-cased always-on |
+| PWM_CTRL  | 0xFD (R/W)  | Bit 0 = enable. Output is forced low whenever disabled, regardless of PWM_DUTY |
+
+## How to test
+
+1. Program the test image onto the Pmod's flash chip (`test/imem.hex`,
+   built by `test/build_prog.py` - exercises every opcode plus the GPIO,
+   timer, and PWM registers) and leave the PSRAM chip's contents as-is;
+   the program initializes any RAM it depends on.
+2. Reset the design (`rst_n` low then high).
+3. Run the clock. The CPU fetches from flash and reads/writes RAM over
+   the shared SPI bus automatically - no host intervention needed once
+   running.
+4. Check final state against the golden reference model
+   (`test/golden.py`) - `test/TESTING.md` and `test/TESTING_round2.md`
+   document the expected register values, and the pipeline this was
+   last verified against.
+
+Before committing to a tapeout, the QSPI Pmod flash-read timing margin
+(`read_delay_cfg` in `qspi_flash_reader.v` / `qspi_psram_ctrl.v`) is
+worth validating on real hardware first, since interconnect delay isn't
+visible in behavioral simulation - see the FPGA bring-up guide for the
+Tiny Tapeout FPGA Development Kit + QSPI Pmod path used for that.
+
+## External hardware
+
+- [Tiny Tapeout QSPI Pmod](https://store.tinytapeout.com/products/QSPI-Pmod-p716541602),
+  plugged into the demoboard's bidirectional Pmod header. One flash chip
+  (program memory) and one of its two PSRAM chips (data memory) are
+  used; the second PSRAM chip is unused.
+- Tiny Tapeout demoboard, or the
+  [FPGA Development Kit](https://store.tinytapeout.com/products/FPGA-Development-Kit-p813805747)
+  for pre-tapeout bring-up on real silicon-adjacent hardware.
