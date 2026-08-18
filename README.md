@@ -48,6 +48,20 @@ Instructions are fetched separately, as two consecutive bytes from
 external flash (big-endian: high byte at PC, low byte at PC+1) - flash
 isn't part of the 8-bit DMEM address space above.
 
+### IO
+
+| # | Input       | Output       | Bidirectional                    |
+| - | ----------- | ------------ | --------------------------------- |
+| 0 | GPIO in 0   | GPIO out 0   | Flash CS (CS0)                    |
+| 1 | GPIO in 1   | GPIO out 1   | SD0 - MOSI (shared flash/PSRAM)   |
+| 2 | GPIO in 2   | GPIO out 2   | SD1 - MISO (shared flash/PSRAM)   |
+| 3 | GPIO in 3   | GPIO out 3   | SCK (shared flash/PSRAM)          |
+| 4 | GPIO in 4   | GPIO out 4   | SD2 (held high, unused)           |
+| 5 | GPIO in 5   | GPIO out 5   | SD3 (held high, unused)           |
+| 6 | GPIO in 6   | GPIO out 6   | RAM A CS (CS1)                    |
+| 7 | GPIO in 7   | PWM output   | RAM B CS (CS2, held high, unused) |
+
+
 #### GPIO
 
 | Register | Address     | Description                                                      |
