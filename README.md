@@ -181,12 +181,12 @@ default per Tiny Tapeout's own FAQ)
 
 ## 2. Architectural inspiration (no code reused)
 
-AbadMCU's central design decision - CPU with no on-chip memory,
+AgilA8's central design decision - CPU with no on-chip memory,
 program fetched from external QSPI flash, working data in external
 QSPI PSRAM, sharing physical SPI wires between them via a separate chip
 selects - follows the same strategic pattern pioneered on Tiny Tapeout
 by the following projects. **No RTL, ISA encoding, or source code from
-either project was copied** - AbadMCU's CPU core, instruction set, and
+either project was copied** - AgilA8's CPU core, instruction set, and
 peripheral RTL were independently designed and implemented. What's
 credited here is the *architectural pattern*, not any specific
 implementation of it.
@@ -211,7 +211,7 @@ specific license - it wasn't confirmed via an explicit license badge
 at the time this was written)
 
 ### RISC-V (conceptual influence only)
-TT8's `r0`-hardwired-to-zero convention and load/store architectural
+A8's `r0`-hardwired-to-zero convention and load/store architectural
 style are modeled on RISC-V's design philosophy. RISC-V is an open,
 freely usable ISA specification; no code is reused here, so this
 carries no license obligation. **TT8 is not RISC-V-compliant** - it's
@@ -223,12 +223,12 @@ RISC-V trademark/logo.
 
 ## 3. What's original to this project
 
-- The TT8 instruction encoding (16-bit fixed-width, R-type/I-type
+- The A8 instruction encoding (16-bit fixed-width, R-type/I-type
   split, the specific opcode table) is a custom design, not derived
   from any existing ISA's bit layout.
-- All RTL in this repository (`tt8_core.v`, `tt8_alu.v`,
-  `tt8_regfile.v`, `tt8_peripherals.v`, `qspi_flash_reader.v`,
-  `qspi_psram_ctrl.v`, `tt_um_abadmcu.v`) was independently written for
+- All RTL in this repository (`a8_core.v`, `a8_alu.v`,
+  `a8_regfile.v`, `a8_peripherals.v`, `qspi_flash_reader.v`,
+  `qspi_psram_ctrl.v`, `tt_um_agila8.v`) was independently written for
   this project.
 - The verification suite, bug fixes, and STA signoff analysis
   documented in this repository's history are this project's own work.
